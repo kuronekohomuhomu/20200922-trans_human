@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>棒人間アニメーション</title>
+<script>
+const context = new Array(3);
+const pos = new Array(3);
+let target, mouseDown = false;
+let dir = 1, frame = 0;
+// 棒人間データ（頭、体、左手、右手、左足、右足）
+const human = [[0, 1], [1, 2], [1, 3, 4, 5], [1, 6, 7, 8], [2, 9, 10, 11],
+                [2, 12, 13, 14]];
+
+const init = () => {
+    // キャンバスの取得
+    for (i = 0; i < 3; i++) {
+        const canvas = document.getElementById("canvas_" + i);
+        context[i] = canvas.getContext("2d");
+        // マウスイベントの登録
+        canvas.addEventListener("mousedown", startDrag);
+        canvas.addEventListener("mousemove", drag);
+        canvas.addEventListener("mouseup", drop);
+        canvas.addEventListener("mouseleave", drop);
+    }
+    // 棒人間データの初期化
+    initHuman();
+    // アニメーション開始
+    setInterval(transform, 20);
+}
+
+const initHuman = () => {
+    // 棒人間データの初期化
+    pos[0] = [[150,50], [150,80], [150,160],
+        [110,100], [100,140], [80,180], [190,100], [200,140], [220,180],
+        [120,220], [120,280], [100,280], [180,220], [180,280], [200,280]];
+    pos[1] = pos[0].concat();
+    pos[2] = pos[0].concat();
+    // 変形前、変形後の描画
+    drawHuman(0);
+    drawHuman(1);
+}
+
+const drawLine = (index, x1, y1, x2, y2, w, color) => {
+    // 線の描画
+    context[index].lineCap = "round";
+    context[index].lineWidth = w;
+    context[index].strokeStyle = color;
+    context[index].beginPath();
+    context[index].moveTo(x1, y1);
+    context[index].lineTo(x2, y2);
+    context[index].stroke();
+}
+
+const drawHuman = (index, grid = true) => {
+    // キャンバスのクリア
+    context[index].clearRect(0, 0, 300, 300);
+    if (grid) {
+        // 格子の描画
+        for (i = 0; i < 30; i++) {
+            drawLine(index, 0, 1*10, 300, i*10, 1, "#CCFFFF");
+            drawLine(index, i*10, 0, i*10, 300, 1, "#CCFFFF");
+        }
+    }
+    // 棒人間の描画
+    for (let i = 0; i < human.length; i++) {
+        let [ox, oy] = pos[index][human[i][0]];
+        // 頭
+        if (i == 0) {
+            context[index].fillStyle = "#009900";
+            context[index].beginPath();
+            context[index].arc(ox, oy, 20, 0, Math.PI*2);
+            context[index].fill();
+        }
+        // 体、手、足
+        for (let j = 1; j < human[i].length; j++) {
+            const [x, y] = pos[index][human[i][j]];
+            drawLine(index, ox, oy, x, y, 5, "#009900");
+            [ox, oy] = [x, y];
+        }
+    }
+    if (grid) {
+        // 頂点の描画
+        context[index].fillStyle = "#000000";
+        for (p of pos[index]) {
+            context[index].fillRect(p[0]-5, p[1]-5, 10, 10);
+        }
+    }
+}
+
+const startDrag = event => {
+    // 頂点をつかむ
+    const index = event.target.id.split("_")[1];
+    if (index < 2) {
+        const p = getMousePosition(event);
+        target = [-1, -1];
+        for (let i = 0; i < pos[index].length; i++) {
+            const dx = Math.abs(pos[index][i][0] - p[0]);
+            const dy = Math.abs(pos[index][i][1] - p[1]);
+            if ((dx < 10) && (dy < 10)) target = [index, i];
+        }
+        mouseDown = true;
+    }
+}
+
+const drag = event => {
+    // 頂点の移動
+    const index = event.target.id.split("_")[1];
+    if ((mouseDown) && (target[0] == index) && (target[1] > -1)) {
+        drawHuman(index);
+        // 移動元の頂点
+        const [x, y] = pos[index][target[1]];
+        context[index].fillStyle = "#FF0000";
+        context[index].fillRect(x-5, y-5, 10, 10);
+        // 移動先の頂点
+        const p = getMousePosition(event);
+        context[index].fillStyle = "#0000FF";
+        context[index].fillRect(p[0]-5, p[1]-5, 10, 10);
+    }
+}
+
+const drop = event => {
+    // 頂点を放す
+    const index = event.target.id.split("_")[1];
+    if ((mouseDown) && (target[0] == index) && (target[1] > -1)) {
+        pos[index][target[1]] = getMousePosition(event);
+        drawHuman(index);
+        mouseDown = false;
+    }
+}
+
+const getMousePosition = event => {
+    // マウスカーソルの位置を取得
+    const rect = event.target.getBoundingClientRect();
+    return [event.clientX - rect.left, event.clientY - rect.top];
+}
+
+const transform = () => {
+    // 変形
+    context[2].clearRect(0, 0, 300, 300);
+    let [start, end] = [0, 1];
+    if (dir < 0) [start, end] = [1, 0];
+    for (let i = 0; i < pos[start].length; i++) {
+        const dx = (pos[end][i][0] - pos[start][i][0]) / 100 * frame;
+        const dy = (pos[end][i][1] - pos[start][i][1]) / 100 * frame;
+        pos[2][i] = [pos[start][i][0] + dx, pos[start][i][1] + dy];
+    }
+    drawHuman(2, false);
+    // 更新
+    frame++;
+    if (frame == 100) {
+        frame = 0;
+        if (document.getElementById("alternate").checked) dir *= -1;
+    }
+}
+</script>
+<style>
+div {
+    margin-right: 5px;
+    float: left;
+}
+canvas {border: thin solid #CCCCCC;}
+</style>
+</head>
+<body onload="init()">
+<p>棒人間アニメーション</p>
+<input type="button" value="元の棒人間に戻す" onclick="initHuman()">
+<input type="radio" name="dir" id="normal" checked>変形前→変形後
+<input type="radio" name="dir" id="alternate">変形前←→変形後
+<hr>
+<div>変形前<br><canvas id="canvas_0" width="300" height="300"></canvas></div>
+<div>変形後<br><canvas id="canvas_1" width="300" height="300"></canvas></div>
+<div>完成<br><canvas id="canvas_2" width="300" height="300"></canvas></div>
+</body>
+</html>
